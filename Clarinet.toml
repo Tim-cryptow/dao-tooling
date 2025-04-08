@@ -1,12 +1,21 @@
 [project]
-name = "blank-project"
+name = "dao-tooling"
 description = "Create a project from scratch: Start from a blank scaffold for your next Clarity contract"
-authors = []
+authors = ["cryptow_tim"]
 telemetry = true
 cache_dir = "./.cache"
 
-# [contracts.CHANGE-THIS-TO-YOUR-CONTRACT-NAME]
-# path = "contracts/CHANGE-THIS-TO-YOUR-CONTRACT-NAME.clar"
+[contracts.dao-core]
+path = "contracts/dao-core.clar"
+
+[contracts.governance]
+path = "contracts/governance.clar"
+
+[contracts.treasury]
+path = "contracts/treasury.clar"
+
+[contracts.governance-trait]
+path = "contracts/governance-trait.clar"
 
 [repl.analysis]
 passes = ["check_checker"]
@@ -16,3 +25,4 @@ strict = false
 trusted_sender = false
 trusted_caller = false
 callee_filter = false
+
