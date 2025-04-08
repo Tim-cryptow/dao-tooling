@@ -5,17 +5,28 @@ authors = ["cryptow_tim"]
 telemetry = true
 cache_dir = "./.cache"
 
-[contracts.dao-core]
-path = "contracts/dao-core.clar"
+# Traits first
+[contracts.dao-core-trait]
+path = "contracts/dao-core-trait.clar"
 
-[contracts.governance]
-path = "contracts/governance.clar"
-
-[contracts.treasury]
-path = "contracts/treasury.clar"
+[contracts.treasury-trait]
+path = "contracts/treasury-trait.clar"
 
 [contracts.governance-trait]
 path = "contracts/governance-trait.clar"
+
+# Implementation contracts
+[contracts.dao-core]
+path = "contracts/dao-core.clar"
+depends_on = ["dao-core-trait"]
+
+[contracts.governance]
+path = "contracts/governance.clar"
+depends_on = ["dao-core-trait", "treasury-trait", "governance-trait"]
+
+[contracts.treasury]
+path = "contracts/treasury.clar"
+depends_on = ["treasury-trait", "governance-trait"]
 
 [repl.analysis]
 passes = ["check_checker"]
@@ -25,4 +36,3 @@ strict = false
 trusted_sender = false
 trusted_caller = false
 callee_filter = false
-

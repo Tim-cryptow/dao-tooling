@@ -1,39 +1,70 @@
-;; Implements the governance trait defined in a separate contract
-(impl-trait 'SP21G72C5JTKS9P8AD5X8JQBBV9JY2A9B08945C77.governance-trait::governance-exec-trait)
+;; Simple treasury contract
+(impl-trait .treasury-trait.treasury-trait)
+(use-trait governance-trait .governance-trait.governance-trait)
 
-(define-constant GOVERNANCE_CONTRACT 'SP21G72C5JTKS9P8AD5X8JQBBV9JY2A9B08945C77.governance)
+;; Constants
+(define-constant ERR_UNAUTHORIZED u300)
+(define-constant ERR_INSUFFICIENT_FUNDS u301)
+(define-constant ERR_INVALID_CALLER u302)
 
-(define-public (deposit)
-  (ok true)
+;; Store the governance contract address
+(define-data-var governance-contract principal tx-sender)
+
+;; Set the governance contract
+(define-public (set-governance (governance principal))
+  (begin
+    (var-set governance-contract governance)
+    (ok true)
+  )
 )
 
-(define-public (spend (proposal-id uint))
-  (let (
-    (proposal (contract-call? GOVERNANCE_CONTRACT proposals proposal-id))
-  )
-    (match proposal
-      proposal-data
-        (begin
-          ;; Only allow spending if NOT executed
-          (asserts! (not (get executed proposal-data)) (err u300))
+;; Check if caller is the governance contract
+(define-private (is-governance)
+  (is-eq tx-sender (var-get governance-contract))
+)
 
+;; Public functions
+(define-public (deposit (amount uint))
+  (stx-transfer? amount tx-sender (as-contract tx-sender))
+)
+
+(define-public (spend (pid uint))
+  (begin
+    ;; Check if caller is the governance contract
+    (asserts! (is-governance) (err ERR_UNAUTHORIZED))
+    
+    ;; Get the governance contract
+    (let (
+      (governance-contract-principal (var-get governance-contract))
+    )
+      ;; Get proposal data
+      (match (as-contract (contract-call? .governance get-proposal pid))
+        proposal-ok proposal-ok
+        proposal-err (err ERR_INVALID_CALLER)
+      )
+      
+      ;; Get spend data
+      (match (as-contract (contract-call? .governance get-spend pid))
+        spend-ok
           (let (
-            (spend-response (contract-call? GOVERNANCE_CONTRACT approved-spends proposal-id))
+            (proposal (unwrap-panic (as-contract (contract-call? .governance get-proposal pid))))
           )
-            (match spend-response
-              spend-data
-                (stx-transfer? (get amount spend-data) tx-sender (get recipient spend-data))
-              err
-                (err u301)
-            )
+            ;; Check if not executed
+            (asserts! (not (get executed proposal)) (err ERR_UNAUTHORIZED))
+            
+            ;; Check if enough funds
+            (asserts! (<= (get amount spend-ok) (as-contract (stx-get-balance tx-sender))) (err ERR_INSUFFICIENT_FUNDS))
+            
+            ;; Transfer funds
+            (as-contract (stx-transfer? (get amount spend-ok) tx-sender (get recipient spend-ok)))
           )
-        )
-      err
-        (err u302)
+        spend-err (err ERR_INVALID_CALLER)
+      )
     )
   )
 )
 
+;; Read-only functions
 (define-read-only (get-balance)
-  (stx-get-balance tx-sender)
+  (ok (as-contract (stx-get-balance tx-sender)))
 )
