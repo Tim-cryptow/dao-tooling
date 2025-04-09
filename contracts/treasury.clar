@@ -6,6 +6,7 @@
 (define-constant ERR_UNAUTHORIZED u300)
 (define-constant ERR_INSUFFICIENT_FUNDS u301)
 (define-constant ERR_INVALID_CALLER u302)
+(define-constant ERR_PROPOSAL_NOT_FOUND u303)
 
 ;; Store the governance contract address
 (define-data-var governance-contract principal tx-sender)
@@ -33,32 +34,30 @@
     ;; Check if caller is the governance contract
     (asserts! (is-governance) (err ERR_UNAUTHORIZED))
     
-    ;; Get the governance contract
+    ;; Get proposal data directly with unwrap
     (let (
-      (governance-contract-principal (var-get governance-contract))
+      (proposal-result (as-contract (contract-call? .governance get-proposal pid)))
     )
-      ;; Get proposal data
-      (match (as-contract (contract-call? .governance get-proposal pid))
-        proposal-ok proposal-ok
-        proposal-err (err ERR_INVALID_CALLER)
+      ;; Check if proposal exists and get it
+      (asserts! (is-ok proposal-result) (err ERR_PROPOSAL_NOT_FOUND))
+      (let (
+        (proposal (unwrap-panic proposal-result))
+        (spend-result (as-contract (contract-call? .governance get-spend pid)))
       )
-      
-      ;; Get spend data
-      (match (as-contract (contract-call? .governance get-spend pid))
-        spend-ok
-          (let (
-            (proposal (unwrap-panic (as-contract (contract-call? .governance get-proposal pid))))
-          )
-            ;; Check if not executed
-            (asserts! (not (get executed proposal)) (err ERR_UNAUTHORIZED))
-            
-            ;; Check if enough funds
-            (asserts! (<= (get amount spend-ok) (as-contract (stx-get-balance tx-sender))) (err ERR_INSUFFICIENT_FUNDS))
-            
-            ;; Transfer funds
-            (as-contract (stx-transfer? (get amount spend-ok) tx-sender (get recipient spend-ok)))
-          )
-        spend-err (err ERR_INVALID_CALLER)
+        ;; Check if spend data exists
+        (asserts! (is-ok spend-result) (err ERR_INVALID_CALLER))
+        (let (
+          (spend-data (unwrap-panic spend-result))
+        )
+          ;; Check if not executed
+          (asserts! (not (get executed proposal)) (err ERR_UNAUTHORIZED))
+          
+          ;; Check if enough funds
+          (asserts! (<= (get amount spend-data) (as-contract (stx-get-balance tx-sender))) (err ERR_INSUFFICIENT_FUNDS))
+          
+          ;; Transfer funds
+          (as-contract (stx-transfer? (get amount spend-data) tx-sender (get recipient spend-data)))
+        )
       )
     )
   )
